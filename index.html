@@ -169,12 +169,95 @@ test('rightmostX: returns the max x', () => {
   assert(rightmostX([{x:100},{x:540},{x:300}]) === 540);
 });
 
+// ---- Game ----
+const game = {
+  state: 'ready',         // 'ready' | 'playing' | 'over'
+  score: 0,
+  hi: 0,
+  y: 0,                   // player height above ground (px)
+  vy: 0,                  // vertical velocity (px/s)
+  ducking: false,
+  frame: 0,               // run animation frame (0/1)
+  frameTimer: 0,
+  obstacles: [],
+  gap: 320,               // distance before next spawn
+  last: 0,
+};
+
+function resetGame(){
+  game.state = 'playing';
+  game.score = 0;
+  game.y = 0; game.vy = 0;
+  game.ducking = false;
+  game.frame = 0; game.frameTimer = 0;
+  game.obstacles = [];
+  game.gap = 320;
+}
+
+function playerSprite(){
+  if (game.ducking && game.y === 0) return HERO_DUCK;
+  return game.frame ? HERO_RUN2 : HERO_RUN1;
+}
+
+function drawCenteredText(ctx, lines, color){
+  ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = "bold 22px " + MONO;
+  let y = H/2 - (lines.length-1)*14;
+  for (const ln of lines){ ctx.fillText(ln, W/2, y); y += 28; }
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+}
+
+function render(){
+  drawScene(ctx);
+  // obstacles (added in Task 9) — drawObstacles() is a no-op until then
+  if (typeof drawObstacles === 'function') drawObstacles();
+  // player
+  const lines = playerSprite();
+  const m = measureBlock(ctx, lines, HERO_FONT);
+  drawBlock(ctx, lines, PLAYER_X, GROUND_Y - m.h - game.y, HERO_FONT, CORAL);
+  // score (added in Task 10) — drawScore() is a no-op until then
+  if (typeof drawScore === 'function') drawScore();
+  // overlays
+  if (game.state === 'ready')
+    drawCenteredText(ctx, ['PRESIONA ESPACIO', 'PARA EMPEZAR'], TEXT_C);
+  if (game.state === 'over')
+    drawCenteredText(ctx, ['GAME OVER', 'ESPACIO PARA REINTENTAR'], TEXT_C);
+}
+
+function update(dt){
+  if (game.state !== 'playing') return;
+  // run animation
+  game.frameTimer += dt;
+  if (game.frameTimer > 0.12){ game.frame ^= 1; game.frameTimer = 0; }
+  // player physics, obstacles, collisions, score added in later tasks
+}
+
+function loop(t){
+  if (!game.last) game.last = t;
+  const dt = Math.min((t - game.last) / 1000, 0.05); // clamp for background tabs
+  game.last = t;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+// ---- Input ----
+function onJumpKey(){
+  if (game.state === 'ready' || game.state === 'over'){ resetGame(); return; }
+  if (game.state === 'playing' && game.y === 0){ game.vy = JUMP_V; }
+}
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'ArrowUp'){ e.preventDefault(); onJumpKey(); }
+  else if (e.code === 'ArrowDown'){ e.preventDefault(); game.ducking = true; }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowDown'){ game.ducking = false; }
+});
+
 // ---- Boot ----
 function boot(){
   if (new URLSearchParams(location.search).has('test')) { runTests(); return; }
-  drawScene(ctx);
-  const m = measureBlock(ctx, HERO_RUN1, HERO_FONT);
-  drawBlock(ctx, HERO_RUN1, PLAYER_X, GROUND_Y - m.h, HERO_FONT, CORAL);
+  requestAnimationFrame(loop);
 }
 boot();
 </script>
