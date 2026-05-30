@@ -111,6 +111,28 @@ function runTests(){
   document.body.innerHTML = ''; document.body.appendChild(pre);
 }
 
+// ---- Pure logic ----
+function aabbOverlap(a, b){
+  return a.x < b.x + b.w &&
+         a.x + a.w > b.x &&
+         a.y < b.y + b.h &&
+         a.y + a.h > b.y;
+}
+
+// ---- Pure logic tests ----
+test('aabbOverlap: overlapping boxes return true', () => {
+  assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:5,y:5,w:10,h:10}) === true);
+});
+test('aabbOverlap: separated on x return false', () => {
+  assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:20,y:0,w:10,h:10}) === false);
+});
+test('aabbOverlap: separated on y return false', () => {
+  assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:0,y:20,w:10,h:10}) === false);
+});
+test('aabbOverlap: edge-touching is not overlap', () => {
+  assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:10,y:0,w:10,h:10}) === false);
+});
+
 // ---- Boot ----
 function boot(){
   if (new URLSearchParams(location.search).has('test')) { runTests(); return; }
