@@ -251,6 +251,16 @@ function drawObstacles(){
   }
 }
 
+function drawScore(){
+  ctx.fillStyle = TEXT_C;
+  ctx.font = "bold 17px " + MONO;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+  const s = String(Math.floor(game.score)).padStart(5, '0');
+  const hi = String(Math.floor(game.hi)).padStart(5, '0');
+  ctx.fillText('HI ' + hi + '   ' + s, W - 16, 16);
+  ctx.textAlign = 'left';
+}
+
 function playerSprite(){
   if (game.ducking && game.y === 0) return HERO_DUCK;
   return game.frame ? HERO_RUN2 : HERO_RUN1;
@@ -304,7 +314,17 @@ function update(dt){
     }
   }
   game.obstacles = game.obstacles.filter(o => o.x + o.w > 0);
-  // collisions + score added in later tasks
+  // score
+  game.score += dt * SCORE_RATE;
+  // collision
+  const pb = getPlayerBox();
+  for (const o of game.obstacles){
+    if (aabbOverlap(pb, getObstacleBox(o))){
+      game.state = 'over';
+      if (game.score > game.hi) game.hi = game.score;
+      break;
+    }
+  }
 }
 
 function loop(t){
