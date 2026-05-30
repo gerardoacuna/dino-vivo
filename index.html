@@ -119,6 +119,10 @@ function aabbOverlap(a, b){
          a.y + a.h > b.y;
 }
 
+function currentSpeed(score){
+  return Math.min(MAX_SPEED, BASE_SPEED + score * SPEED_PER_SCORE);
+}
+
 // ---- Pure logic tests ----
 test('aabbOverlap: overlapping boxes return true', () => {
   assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:5,y:5,w:10,h:10}) === true);
@@ -131,6 +135,15 @@ test('aabbOverlap: separated on y return false', () => {
 });
 test('aabbOverlap: edge-touching is not overlap', () => {
   assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:10,y:0,w:10,h:10}) === false);
+});
+test('currentSpeed: starts at BASE_SPEED when score is 0', () => {
+  assert(currentSpeed(0) === BASE_SPEED);
+});
+test('currentSpeed: increases with score', () => {
+  assert(currentSpeed(100) > currentSpeed(0));
+});
+test('currentSpeed: never exceeds MAX_SPEED', () => {
+  assert(currentSpeed(100000) === MAX_SPEED);
 });
 
 // ---- Boot ----
