@@ -53,8 +53,10 @@ const HERO_DUCK = [
 const CACTUS = [
   "  █  ",
   "█ █  ",
+  "█ █ █",
   "███ █",
   "  ███",
+  "  █  ",
   "  █  ",
 ];
 const BIRD1 = [
@@ -231,6 +233,7 @@ function resetGame(){
   game.frame = 0; game.frameTimer = 0;
   game.obstacles = [];
   game.gap = 320;
+  game.last = 0;
 }
 
 function randGap(){ return 260 + Math.random() * 260; }   // 260..520 px
@@ -241,7 +244,7 @@ function makeObstacle(kind){
   const m = measureBlock(ctx, frames[0], OBST_FONT);
   let topY;
   if (kind === 'cactus')        topY = GROUND_Y - m.h;        // on the ground -> jump
-  else if (kind === 'birdHigh') topY = 96;                    // body height -> duck
+  else if (kind === 'birdHigh') topY = 105;                   // body height -> duck
   else                          topY = GROUND_Y - m.h - 30;   // low -> jump
   return { kind, frames, color, x: W, y: topY, w: m.w, h: m.h, flip: 0, flipT: 0 };
 }
@@ -285,14 +288,12 @@ function drawCenteredText(ctx, lines, color){
 
 function render(){
   drawScene(ctx);
-  // obstacles (added in Task 9) — drawObstacles() is a no-op until then
-  if (typeof drawObstacles === 'function') drawObstacles();
+  drawObstacles();
   // player
   const lines = playerSprite();
   const m = measureBlock(ctx, lines, HERO_FONT);
   drawBlock(ctx, lines, PLAYER_X, GROUND_Y - m.h - game.y, HERO_FONT, CORAL);
-  // score (added in Task 10) — drawScore() is a no-op until then
-  if (typeof drawScore === 'function') drawScore();
+  drawScore();
   // overlays
   if (game.state === 'ready')
     drawCenteredText(ctx, ['PRESIONA ESPACIO', 'PARA EMPEZAR'], TEXT_C);
