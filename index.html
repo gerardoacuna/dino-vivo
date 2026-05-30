@@ -200,10 +200,19 @@ test('getObstacleBox: shrinks the obstacle footprint', () => {
 });
 
 // ---- Game ----
+function loadHi(){
+  try { return parseInt(localStorage.getItem(HI_KEY), 10) || 0; }
+  catch(e){ return 0; }
+}
+function saveHi(v){
+  try { localStorage.setItem(HI_KEY, String(Math.floor(v))); }
+  catch(e){ /* localStorage unavailable; keep playing without persistence */ }
+}
+
 const game = {
   state: 'ready',         // 'ready' | 'playing' | 'over'
   score: 0,
-  hi: 0,
+  hi: loadHi(),
   y: 0,                   // player height above ground (px)
   vy: 0,                  // vertical velocity (px/s)
   ducking: false,
@@ -321,7 +330,7 @@ function update(dt){
   for (const o of game.obstacles){
     if (aabbOverlap(pb, getObstacleBox(o))){
       game.state = 'over';
-      if (game.score > game.hi) game.hi = game.score;
+      if (game.score > game.hi){ game.hi = game.score; saveHi(game.hi); }
       break;
     }
   }
