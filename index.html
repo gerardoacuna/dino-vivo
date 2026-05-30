@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dino Run ASCII</title>
+<style>
+  html,body{height:100%;margin:0;background:#0e2230;display:flex;
+    align-items:center;justify-content:center;font-family:system-ui,sans-serif}
+  #game{image-rendering:pixelated;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  #hint{color:#cfe6ff;text-align:center;margin-top:10px;font-size:13px;opacity:.8}
+</style>
+</head>
+<body>
+<div>
+  <canvas id="game" width="660" height="220"></canvas>
+  <div id="hint">Espacio/↑ saltar · ↓ agacharse</div>
+</div>
+<script>
+// ---- Constants ----
+const W = 660, H = 220, GROUND_Y = 174;
+const MONO = "ui-monospace, 'SF Mono', Menlo, monospace";
+const PLAYER_X = 48;
+const GRAVITY = 2600, JUMP_V = 820;
+const BASE_SPEED = 240, SPEED_PER_SCORE = 0.7, MAX_SPEED = 560;
+const SCORE_RATE = 12;
+const HERO_FONT = 22, OBST_FONT = 16;
+const SHRINK = 0.22, OBST_SHRINK = 0.18;
+const SKY_TOP = '#bfe3ff', SKY_BOT = '#eafaff';
+const GROUND_C = '#d9b382', GROUND_LINE = '#a87f4f';
+const CORAL = '#cf6a4c', GREEN = '#3f9e54', BIRDC = '#6b4fa3';
+const TEXT_C = '#2c3e50';
+const HI_KEY = 'dinoAsciiHiScore';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// ---- Sprites (block ASCII) ----
+const HERO_RUN1 = [
+  " ▐▛███▜▌ ",
+  "▝▜█████▛▘",
+  "  ▘▘ ▝▝  ",
+];
+const HERO_RUN2 = [
+  " ▐▛███▜▌ ",
+  "▝▜█████▛▘",
+  "  ▖▖ ▗▗  ",
+];
+const HERO_DUCK = [
+  "▗▆█████▆▖",
+  "▝▘▘  ▝▝▘ ",
+];
+const CACTUS = [
+  "  █  ",
+  "█ █  ",
+  "█ █ █",
+  "███ █",
+  "  ███",
+  "  █  ",
+  "  █  ",
+];
+const BIRD1 = [
+  "▝▙   ▟▘",
+  " ▜███▛ ",
+];
+const BIRD2 = [
+  " ▟███▙ ",
+  "▝▛   ▜▘",
+];
+
+// ---- Block drawing ----
+function drawBlock(ctx, lines, x, topY, fontPx, color){
+  ctx.font = fontPx + "px " + MONO;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = color;
+  let y = topY;
+  for (const ln of lines){ ctx.fillText(ln, x, y); y += fontPx; }
+}
+function measureBlock(ctx, lines, fontPx){
+  ctx.font = fontPx + "px " + MONO;
+  let w = 0;
+  for (const ln of lines) w = Math.max(w, ctx.measureText(ln).width);
+  return { w, h: lines.length * fontPx };
+}
+
+// ---- Scene background ----
+function drawScene(ctx){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0, SKY_TOP); g.addColorStop(1, SKY_BOT);
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = GROUND_C; ctx.fillRect(0, GROUND_Y, W, H-GROUND_Y);
+  ctx.strokeStyle = GROUND_LINE; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0,GROUND_Y); ctx.lineTo(W,GROUND_Y); ctx.stroke();
+  ctx.fillStyle = GROUND_LINE;
+  for(let i=10;i<W;i+=52) ctx.fillRect(i, GROUND_Y+14, 10, 3);
+}
+
+// ---- Test harness ----
+const TESTS = [];
+function test(name, fn){ TESTS.push({name, fn}); }
+function assert(cond, msg){ if(!cond) throw new Error(msg || 'assertion failed'); }
+function runTests(){
+  const out = TESTS.map(t => {
+    try { t.fn(); return {name:t.name, pass:true}; }
+    catch(e){ return {name:t.name, pass:false, err:e.message}; }
+  });
+  const pre = document.createElement('pre');
+  pre.style.cssText = "font:14px monospace;padding:16px;color:#cfe6ff;text-align:left";
+  pre.textContent = out.map(r => (r.pass?'PASS ':'FAIL ') + r.name +
+    (r.err ? ' — ' + r.err : '')).join('\n') +
+    '\n\n' + out.filter(r=>r.pass).length + '/' + out.length + ' passed';
+  document.body.innerHTML = ''; document.body.appendChild(pre);
+}
+
+// ---- Pure logic ----
+function aabbOverlap(a, b){
+  return a.x < b.x + b.w &&
+         a.x + a.w > b.x &&
+         a.y < b.y + b.h &&
+         a.y + a.h > b.y;
+}
+
+function currentSpeed(score){
+  return Math.min(MAX_SPEED, BASE_SPEED + score * SPEED_PER_SCORE);
+}
+
+function shouldSpawn(rightmost, canvasW, gap){
+  return rightmost < canvasW - gap;
+}
+
+function rightmostX(obstacles){
+  return obstacles.length ? Math.max(...obstacles.map(o => o.x)) : -Infinity;
+}
+
+function getPlayerBox(){
+  const lines = playerSprite();
+  const m = measureBlock(ctx, lines, HERO_FONT);
+  const topY = GROUND_Y - m.h - game.y;
+  const padX = m.w * SHRINK, padY = m.h * SHRINK;
+  return { x: PLAYER_X + padX, y: topY + padY, w: m.w - 2*padX, h: m.h - 2*padY };
+}
+
+function getObstacleBox(o){
+  const padX = o.w * OBST_SHRINK, padY = o.h * OBST_SHRINK;
+  return { x: o.x + padX, y: o.y + padY, w: o.w - 2*padX, h: o.h - 2*padY };
+}
+
+// ---- Pure logic tests ----
+test('aabbOverlap: overlapping boxes return true', () => {
+  assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:5,y:5,w:10,h:10}) === true);
+});
+test('aabbOverlap: separated on x return false', () => {
+  assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:20,y:0,w:10,h:10}) === false);
+});
+test('aabbOverlap: separated on y return false', () => {
+  assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:0,y:20,w:10,h:10}) === false);
+});
+test('aabbOverlap: edge-touching is not overlap', () => {
+  assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:10,y:0,w:10,h:10}) === false);
+});
+test('currentSpeed: starts at BASE_SPEED when score is 0', () => {
+  assert(currentSpeed(0) === BASE_SPEED);
+});
+test('currentSpeed: increases with score', () => {
+  assert(currentSpeed(100) > currentSpeed(0));
+});
+test('currentSpeed: never exceeds MAX_SPEED', () => {
+  assert(currentSpeed(100000) === MAX_SPEED);
+});
+test('shouldSpawn: true when rightmost obstacle is far enough left', () => {
+  assert(shouldSpawn(300, 660, 280) === true);   // 300 < 660-280=380
+});
+test('shouldSpawn: false when rightmost obstacle still too close to edge', () => {
+  assert(shouldSpawn(500, 660, 280) === false);   // 500 > 380
+});
+test('shouldSpawn: true when there are no obstacles (-Infinity)', () => {
+  assert(shouldSpawn(-Infinity, 660, 280) === true);
+});
+test('rightmostX: returns -Infinity for empty list', () => {
+  assert(rightmostX([]) === -Infinity);
+});
+test('rightmostX: returns the max x', () => {
+  assert(rightmostX([{x:100},{x:540},{x:300}]) === 540);
+});
+test('getPlayerBox: shrinks the sprite footprint and sits on the ground', () => {
+  game.y = 0; game.ducking = false; game.frame = 0;
+  const b = getPlayerBox();
+  assert(b.x > PLAYER_X, 'box x padded inward');
+  assert(Math.abs((b.y + b.h) - (GROUND_Y - 0)) < HERO_FONT, 'box bottom near ground');
+});
+test('getPlayerBox: raises with jump height', () => {
+  game.y = 0; const ground = getPlayerBox();
+  game.y = 100; const air = getPlayerBox();
+  game.y = 0;
+  assert(air.y < ground.y, 'jumping raises the box');
+});
+test('getObstacleBox: shrinks the obstacle footprint', () => {
+  const o = {x:100, y:50, w:40, h:30};
+  const b = getObstacleBox(o);
+  assert(b.x > o.x && b.w < o.w && b.h < o.h);
+});
+
+// ---- Game ----
+function loadHi(){
+  try { return parseInt(localStorage.getItem(HI_KEY), 10) || 0; }
+  catch(e){ return 0; }
+}
+function saveHi(v){
+  try { localStorage.setItem(HI_KEY, String(Math.floor(v))); }
+  catch(e){ /* localStorage unavailable; keep playing without persistence */ }
+}
+
+const game = {
+  state: 'ready',         // 'ready' | 'playing' | 'over'
+  score: 0,
+  hi: loadHi(),
+  y: 0,                   // player height above ground (px)
+  vy: 0,                  // vertical velocity (px/s)
+  ducking: false,
+  frame: 0,               // run animation frame (0/1)
+  frameTimer: 0,
+  obstacles: [],
+  gap: 320,               // distance before next spawn
+  last: 0,
+};
+
+function resetGame(){
+  game.state = 'playing';
+  game.score = 0;
+  game.y = 0; game.vy = 0;
+  game.ducking = false;
+  game.frame = 0; game.frameTimer = 0;
+  game.obstacles = [];
+  game.gap = 320;
+  game.last = 0;
+}
+
+function randGap(){ return 260 + Math.random() * 260; }   // 260..520 px
+
+function makeObstacle(kind){
+  const frames = kind === 'cactus' ? [CACTUS] : [BIRD1, BIRD2];
+  const color  = kind === 'cactus' ? GREEN : BIRDC;
+  const m = measureBlock(ctx, frames[0], OBST_FONT);
+  let topY;
+  if (kind === 'cactus')        topY = GROUND_Y - m.h;        // on the ground -> jump
+  else if (kind === 'birdHigh') topY = 105;                   // body height -> duck
+  else                          topY = GROUND_Y - m.h - 30;   // low -> jump
+  return { kind, frames, color, x: W, y: topY, w: m.w, h: m.h, flip: 0, flipT: 0 };
+}
+
+function spawnObstacle(){
+  const r = Math.random();
+  const kind = r < 0.5 ? 'cactus' : (r < 0.75 ? 'birdHigh' : 'birdLow');
+  game.obstacles.push(makeObstacle(kind));
+  game.gap = randGap();
+}
+
+function drawObstacles(){
+  for (const o of game.obstacles){
+    const frame = o.frames.length > 1 ? o.frames[o.flip] : o.frames[0];
+    drawBlock(ctx, frame, o.x, o.y, OBST_FONT, o.color);
+  }
+}
+
+function drawScore(){
+  ctx.fillStyle = TEXT_C;
+  ctx.font = "bold 17px " + MONO;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+  const s = String(Math.floor(game.score)).padStart(5, '0');
+  const hi = String(Math.floor(game.hi)).padStart(5, '0');
+  ctx.fillText('HI ' + hi + '   ' + s, W - 16, 16);
+  ctx.textAlign = 'left';
+}
+
+function playerSprite(){
+  if (game.ducking && game.y === 0) return HERO_DUCK;
+  return game.frame ? HERO_RUN2 : HERO_RUN1;
+}
+
+function drawCenteredText(ctx, lines, color){
+  ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = "bold 22px " + MONO;
+  let y = H/2 - (lines.length-1)*14;
+  for (const ln of lines){ ctx.fillText(ln, W/2, y); y += 28; }
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+}
+
+function render(){
+  drawScene(ctx);
+  drawObstacles();
+  // player
+  const lines = playerSprite();
+  const m = measureBlock(ctx, lines, HERO_FONT);
+  drawBlock(ctx, lines, PLAYER_X, GROUND_Y - m.h - game.y, HERO_FONT, CORAL);
+  drawScore();
+  // overlays
+  if (game.state === 'ready')
+    drawCenteredText(ctx, ['PRESIONA ESPACIO', 'PARA EMPEZAR'], TEXT_C);
+  if (game.state === 'over')
+    drawCenteredText(ctx, ['GAME OVER', 'ESPACIO PARA REINTENTAR'], TEXT_C);
+}
+
+function update(dt){
+  if (game.state !== 'playing') return;
+  // run animation
+  game.frameTimer += dt;
+  if (game.frameTimer > 0.12){ game.frame ^= 1; game.frameTimer = 0; }
+  // jump physics
+  if (game.y > 0 || game.vy !== 0){
+    game.y += game.vy * dt;
+    game.vy -= GRAVITY * dt;
+    if (game.y <= 0){ game.y = 0; game.vy = 0; }
+  }
+  // spawn
+  if (shouldSpawn(rightmostX(game.obstacles), W, game.gap)) spawnObstacle();
+  // move + animate + cull
+  const speed = currentSpeed(game.score);
+  for (const o of game.obstacles){
+    o.x -= speed * dt;
+    if (o.frames.length > 1){
+      o.flipT += dt;
+      if (o.flipT > 0.15){ o.flip ^= 1; o.flipT = 0; }
+    }
+  }
+  game.obstacles = game.obstacles.filter(o => o.x + o.w > 0);
+  // score
+  game.score += dt * SCORE_RATE;
+  // collision
+  const pb = getPlayerBox();
+  for (const o of game.obstacles){
+    if (aabbOverlap(pb, getObstacleBox(o))){
+      game.state = 'over';
+      if (game.score > game.hi){ game.hi = game.score; saveHi(game.hi); }
+      break;
+    }
+  }
+}
+
+function loop(t){
+  if (!game.last) game.last = t;
+  const dt = Math.min((t - game.last) / 1000, 0.05); // clamp for background tabs
+  game.last = t;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+// ---- Input ----
+function onJumpKey(){
+  if (game.state === 'ready' || game.state === 'over'){ resetGame(); return; }
+  if (game.state === 'playing' && game.y === 0){ game.vy = JUMP_V; }
+}
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'ArrowUp'){ e.preventDefault(); onJumpKey(); }
+  else if (e.code === 'ArrowDown'){ e.preventDefault(); game.ducking = true; }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowDown'){ game.ducking = false; }
+});
+
+// ---- Boot ----
+function boot(){
+  if (new URLSearchParams(location.search).has('test')) { runTests(); return; }
+  requestAnimationFrame(loop);
+}
+boot();
+</script>
+</body>
+</html>
