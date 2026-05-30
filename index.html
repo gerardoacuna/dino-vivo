@@ -123,6 +123,14 @@ function currentSpeed(score){
   return Math.min(MAX_SPEED, BASE_SPEED + score * SPEED_PER_SCORE);
 }
 
+function shouldSpawn(rightmost, canvasW, gap){
+  return rightmost < canvasW - gap;
+}
+
+function rightmostX(obstacles){
+  return obstacles.length ? Math.max(...obstacles.map(o => o.x)) : -Infinity;
+}
+
 // ---- Pure logic tests ----
 test('aabbOverlap: overlapping boxes return true', () => {
   assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:5,y:5,w:10,h:10}) === true);
@@ -144,6 +152,21 @@ test('currentSpeed: increases with score', () => {
 });
 test('currentSpeed: never exceeds MAX_SPEED', () => {
   assert(currentSpeed(100000) === MAX_SPEED);
+});
+test('shouldSpawn: true when rightmost obstacle is far enough left', () => {
+  assert(shouldSpawn(300, 660, 280) === true);   // 300 < 660-280=380
+});
+test('shouldSpawn: false when rightmost obstacle still too close to edge', () => {
+  assert(shouldSpawn(500, 660, 280) === false);   // 500 > 380
+});
+test('shouldSpawn: true when there are no obstacles (-Infinity)', () => {
+  assert(shouldSpawn(-Infinity, 660, 280) === true);
+});
+test('rightmostX: returns -Infinity for empty list', () => {
+  assert(rightmostX([]) === -Infinity);
+});
+test('rightmostX: returns the max x', () => {
+  assert(rightmostX([{x:100},{x:540},{x:300}]) === 540);
 });
 
 // ---- Boot ----
