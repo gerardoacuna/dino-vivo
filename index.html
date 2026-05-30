@@ -131,6 +131,19 @@ function rightmostX(obstacles){
   return obstacles.length ? Math.max(...obstacles.map(o => o.x)) : -Infinity;
 }
 
+function getPlayerBox(){
+  const lines = playerSprite();
+  const m = measureBlock(ctx, lines, HERO_FONT);
+  const topY = GROUND_Y - m.h - game.y;
+  const padX = m.w * SHRINK, padY = m.h * SHRINK;
+  return { x: PLAYER_X + padX, y: topY + padY, w: m.w - 2*padX, h: m.h - 2*padY };
+}
+
+function getObstacleBox(o){
+  const padX = o.w * OBST_SHRINK, padY = o.h * OBST_SHRINK;
+  return { x: o.x + padX, y: o.y + padY, w: o.w - 2*padX, h: o.h - 2*padY };
+}
+
 // ---- Pure logic tests ----
 test('aabbOverlap: overlapping boxes return true', () => {
   assert(aabbOverlap({x:0,y:0,w:10,h:10}, {x:5,y:5,w:10,h:10}) === true);
@@ -167,6 +180,23 @@ test('rightmostX: returns -Infinity for empty list', () => {
 });
 test('rightmostX: returns the max x', () => {
   assert(rightmostX([{x:100},{x:540},{x:300}]) === 540);
+});
+test('getPlayerBox: shrinks the sprite footprint and sits on the ground', () => {
+  game.y = 0; game.ducking = false; game.frame = 0;
+  const b = getPlayerBox();
+  assert(b.x > PLAYER_X, 'box x padded inward');
+  assert(Math.abs((b.y + b.h) - (GROUND_Y - 0)) < HERO_FONT, 'box bottom near ground');
+});
+test('getPlayerBox: raises with jump height', () => {
+  game.y = 0; const ground = getPlayerBox();
+  game.y = 100; const air = getPlayerBox();
+  game.y = 0;
+  assert(air.y < ground.y, 'jumping raises the box');
+});
+test('getObstacleBox: shrinks the obstacle footprint', () => {
+  const o = {x:100, y:50, w:40, h:30};
+  const b = getObstacleBox(o);
+  assert(b.x > o.x && b.w < o.w && b.h < o.h);
 });
 
 // ---- Game ----
