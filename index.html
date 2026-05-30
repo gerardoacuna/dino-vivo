@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dino Run ASCII</title>
+<style>
+  html,body{height:100%;margin:0;background:#0e2230;display:flex;
+    align-items:center;justify-content:center;font-family:system-ui,sans-serif}
+  #game{image-rendering:pixelated;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  #hint{color:#cfe6ff;text-align:center;margin-top:10px;font-size:13px;opacity:.8}
+</style>
+</head>
+<body>
+<div>
+  <canvas id="game" width="660" height="220"></canvas>
+  <div id="hint">Espacio/↑ saltar · ↓ agacharse</div>
+</div>
+<script>
+// ---- Constants ----
+const W = 660, H = 220, GROUND_Y = 174;
+const MONO = "ui-monospace, 'SF Mono', Menlo, monospace";
+const PLAYER_X = 48;
+const GRAVITY = 2600, JUMP_V = 820;
+const BASE_SPEED = 240, SPEED_PER_SCORE = 0.7, MAX_SPEED = 560;
+const SCORE_RATE = 12;
+const HERO_FONT = 22, OBST_FONT = 16;
+const SHRINK = 0.22, OBST_SHRINK = 0.18;
+const SKY_TOP = '#bfe3ff', SKY_BOT = '#eafaff';
+const GROUND_C = '#d9b382', GROUND_LINE = '#a87f4f';
+const CORAL = '#cf6a4c', GREEN = '#3f9e54', BIRDC = '#6b4fa3';
+const TEXT_C = '#2c3e50';
+const HI_KEY = 'dinoAsciiHiScore';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// ---- Scene background ----
+function drawScene(ctx){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0, SKY_TOP); g.addColorStop(1, SKY_BOT);
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = GROUND_C; ctx.fillRect(0, GROUND_Y, W, H-GROUND_Y);
+  ctx.strokeStyle = GROUND_LINE; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0,GROUND_Y); ctx.lineTo(W,GROUND_Y); ctx.stroke();
+  ctx.fillStyle = GROUND_LINE;
+  for(let i=10;i<W;i+=52) ctx.fillRect(i, GROUND_Y+14, 10, 3);
+}
+
+// ---- Test harness ----
+const TESTS = [];
+function test(name, fn){ TESTS.push({name, fn}); }
+function assert(cond, msg){ if(!cond) throw new Error(msg || 'assertion failed'); }
+function runTests(){
+  const out = TESTS.map(t => {
+    try { t.fn(); return {name:t.name, pass:true}; }
+    catch(e){ return {name:t.name, pass:false, err:e.message}; }
+  });
+  const pre = document.createElement('pre');
+  pre.style.cssText = "font:14px monospace;padding:16px;color:#cfe6ff;text-align:left";
+  pre.textContent = out.map(r => (r.pass?'PASS ':'FAIL ') + r.name +
+    (r.err ? ' — ' + r.err : '')).join('\n') +
+    '\n\n' + out.filter(r=>r.pass).length + '/' + out.length + ' passed';
+  document.body.innerHTML = ''; document.body.appendChild(pre);
+}
+
+// ---- Boot ----
+function boot(){
+  if (new URLSearchParams(location.search).has('test')) { runTests(); return; }
+  drawScene(ctx); // placeholder until the loop is added
+}
+boot();
+</script>
+</body>
+</html>
