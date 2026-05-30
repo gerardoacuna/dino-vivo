@@ -224,6 +224,33 @@ function resetGame(){
   game.gap = 320;
 }
 
+function randGap(){ return 260 + Math.random() * 260; }   // 260..520 px
+
+function makeObstacle(kind){
+  const frames = kind === 'cactus' ? [CACTUS] : [BIRD1, BIRD2];
+  const color  = kind === 'cactus' ? GREEN : BIRDC;
+  const m = measureBlock(ctx, frames[0], OBST_FONT);
+  let topY;
+  if (kind === 'cactus')        topY = GROUND_Y - m.h;        // on the ground -> jump
+  else if (kind === 'birdHigh') topY = 96;                    // body height -> duck
+  else                          topY = GROUND_Y - m.h - 30;   // low -> jump
+  return { kind, frames, color, x: W, y: topY, w: m.w, h: m.h, flip: 0, flipT: 0 };
+}
+
+function spawnObstacle(){
+  const r = Math.random();
+  const kind = r < 0.5 ? 'cactus' : (r < 0.75 ? 'birdHigh' : 'birdLow');
+  game.obstacles.push(makeObstacle(kind));
+  game.gap = randGap();
+}
+
+function drawObstacles(){
+  for (const o of game.obstacles){
+    const frame = o.frames.length > 1 ? o.frames[o.flip] : o.frames[0];
+    drawBlock(ctx, frame, o.x, o.y, OBST_FONT, o.color);
+  }
+}
+
 function playerSprite(){
   if (game.ducking && game.y === 0) return HERO_DUCK;
   return game.frame ? HERO_RUN2 : HERO_RUN1;
@@ -265,7 +292,19 @@ function update(dt){
     game.vy -= GRAVITY * dt;
     if (game.y <= 0){ game.y = 0; game.vy = 0; }
   }
-  // player physics, obstacles, collisions, score added in later tasks
+  // spawn
+  if (shouldSpawn(rightmostX(game.obstacles), W, game.gap)) spawnObstacle();
+  // move + animate + cull
+  const speed = currentSpeed(game.score);
+  for (const o of game.obstacles){
+    o.x -= speed * dt;
+    if (o.frames.length > 1){
+      o.flipT += dt;
+      if (o.flipT > 0.15){ o.flip ^= 1; o.flipT = 0; }
+    }
+  }
+  game.obstacles = game.obstacles.filter(o => o.x + o.w > 0);
+  // collisions + score added in later tasks
 }
 
 function loop(t){
