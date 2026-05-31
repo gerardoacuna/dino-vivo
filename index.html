@@ -336,6 +336,11 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'ArrowUp'){ e.preventDefault(); onJumpKey(); }
 });
 
+window.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  onJumpKey();
+});
+
 // ---- Boot ----
 function boot(){
   if (new URLSearchParams(location.search).has('test')) { runTests(); return; }
