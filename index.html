@@ -7,14 +7,15 @@
 <style>
   html,body{height:100%;margin:0;background:#0e2230;display:flex;
     align-items:center;justify-content:center;font-family:system-ui,sans-serif}
-  #game{image-rendering:pixelated;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  #wrap{width:min(96vw,720px)}
+  #game{image-rendering:pixelated;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}
   #hint{color:#cfe6ff;text-align:center;margin-top:10px;font-size:13px;opacity:.8}
 </style>
 </head>
 <body>
-<div>
+<div id="wrap">
   <canvas id="game" width="660" height="220"></canvas>
-  <div id="hint">Espacio/↑ saltar · ↓ agacharse</div>
+  <div id="hint">Toca la pantalla o Espacio para saltar</div>
 </div>
 <script>
 // ---- Constants ----
@@ -28,7 +29,7 @@ const HERO_FONT = 22, OBST_FONT = 16;
 const SHRINK = 0.22, OBST_SHRINK = 0.18;
 const SKY_TOP = '#bfe3ff', SKY_BOT = '#eafaff';
 const GROUND_C = '#d9b382', GROUND_LINE = '#a87f4f';
-const CORAL = '#cf6a4c', GREEN = '#3f9e54', BIRDC = '#6b4fa3';
+const CORAL = '#cf6a4c', GREEN = '#3f9e54';
 const TEXT_C = '#2c3e50';
 const HI_KEY = 'dinoAsciiHiScore';
 
@@ -46,10 +47,6 @@ const HERO_RUN2 = [
   "▝▜█████▛▘",
   "  ▖▖ ▗▗  ",
 ];
-const HERO_DUCK = [
-  "▗▆█████▆▖",
-  "▝▘▘  ▝▝▘ ",
-];
 const CACTUS = [
   "  █  ",
   "█ █  ",
@@ -58,14 +55,6 @@ const CACTUS = [
   "  ███",
   "  █  ",
   "  █  ",
-];
-const BIRD1 = [
-  "▝▙   ▟▘",
-  " ▜███▛ ",
-];
-const BIRD2 = [
-  " ▟███▙ ",
-  "▝▛   ▜▘",
 ];
 
 // ---- Block drawing ----
@@ -184,7 +173,7 @@ test('rightmostX: returns the max x', () => {
   assert(rightmostX([{x:100},{x:540},{x:300}]) === 540);
 });
 test('getPlayerBox: shrinks the sprite footprint and sits on the ground', () => {
-  game.y = 0; game.ducking = false; game.frame = 0;
+  game.y = 0; game.frame = 0;
   const b = getPlayerBox();
   assert(b.x > PLAYER_X, 'box x padded inward');
   assert(Math.abs((b.y + b.h) - (GROUND_Y - 0)) < HERO_FONT, 'box bottom near ground');
@@ -199,6 +188,15 @@ test('getObstacleBox: shrinks the obstacle footprint', () => {
   const o = {x:100, y:50, w:40, h:30};
   const b = getObstacleBox(o);
   assert(b.x > o.x && b.w < o.w && b.h < o.h);
+});
+test('spawnObstacle: only spawns ground cacti', () => {
+  game.obstacles = [];
+  for (let i = 0; i < 20; i++) spawnObstacle();
+  for (const o of game.obstacles){
+    assert(o.h === CACTUS.length * OBST_FONT, 'every obstacle has cactus height');
+    assert(Math.abs((o.y + o.h) - GROUND_Y) < 0.001, 'every obstacle sits on the ground');
+  }
+  game.obstacles = [];
 });
 
 // ---- Game ----
@@ -217,7 +215,6 @@ const game = {
   hi: loadHi(),
   y: 0,                   // player height above ground (px)
   vy: 0,                  // vertical velocity (px/s)
-  ducking: false,
   frame: 0,               // run animation frame (0/1)
   frameTimer: 0,
   obstacles: [],
@@ -229,7 +226,6 @@ function resetGame(){
   game.state = 'playing';
   game.score = 0;
   game.y = 0; game.vy = 0;
-  game.ducking = false;
   game.frame = 0; game.frameTimer = 0;
   game.obstacles = [];
   game.gap = 320;
@@ -238,28 +234,19 @@ function resetGame(){
 
 function randGap(){ return 260 + Math.random() * 260; }   // 260..520 px
 
-function makeObstacle(kind){
-  const frames = kind === 'cactus' ? [CACTUS] : [BIRD1, BIRD2];
-  const color  = kind === 'cactus' ? GREEN : BIRDC;
-  const m = measureBlock(ctx, frames[0], OBST_FONT);
-  let topY;
-  if (kind === 'cactus')        topY = GROUND_Y - m.h;        // on the ground -> jump
-  else if (kind === 'birdHigh') topY = 105;                   // body height -> duck
-  else                          topY = GROUND_Y - m.h - 30;   // low -> jump
-  return { kind, frames, color, x: W, y: topY, w: m.w, h: m.h, flip: 0, flipT: 0 };
+function makeObstacle(){
+  const m = measureBlock(ctx, CACTUS, OBST_FONT);
+  return { x: W, y: GROUND_Y - m.h, w: m.w, h: m.h };
 }
 
 function spawnObstacle(){
-  const r = Math.random();
-  const kind = r < 0.5 ? 'cactus' : (r < 0.75 ? 'birdHigh' : 'birdLow');
-  game.obstacles.push(makeObstacle(kind));
+  game.obstacles.push(makeObstacle());
   game.gap = randGap();
 }
 
 function drawObstacles(){
   for (const o of game.obstacles){
-    const frame = o.frames.length > 1 ? o.frames[o.flip] : o.frames[0];
-    drawBlock(ctx, frame, o.x, o.y, OBST_FONT, o.color);
+    drawBlock(ctx, CACTUS, o.x, o.y, OBST_FONT, GREEN);
   }
 }
 
@@ -274,7 +261,6 @@ function drawScore(){
 }
 
 function playerSprite(){
-  if (game.ducking && game.y === 0) return HERO_DUCK;
   return game.frame ? HERO_RUN2 : HERO_RUN1;
 }
 
@@ -296,9 +282,9 @@ function render(){
   drawScore();
   // overlays
   if (game.state === 'ready')
-    drawCenteredText(ctx, ['PRESIONA ESPACIO', 'PARA EMPEZAR'], TEXT_C);
+    drawCenteredText(ctx, ['TOCA O ESPACIO', 'PARA EMPEZAR'], TEXT_C);
   if (game.state === 'over')
-    drawCenteredText(ctx, ['GAME OVER', 'ESPACIO PARA REINTENTAR'], TEXT_C);
+    drawCenteredText(ctx, ['GAME OVER', 'TOCA PARA REINTENTAR'], TEXT_C);
 }
 
 function update(dt){
@@ -318,10 +304,6 @@ function update(dt){
   const speed = currentSpeed(game.score);
   for (const o of game.obstacles){
     o.x -= speed * dt;
-    if (o.frames.length > 1){
-      o.flipT += dt;
-      if (o.flipT > 0.15){ o.flip ^= 1; o.flipT = 0; }
-    }
   }
   game.obstacles = game.obstacles.filter(o => o.x + o.w > 0);
   // score
@@ -353,10 +335,11 @@ function onJumpKey(){
 }
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'ArrowUp'){ e.preventDefault(); onJumpKey(); }
-  else if (e.code === 'ArrowDown'){ e.preventDefault(); game.ducking = true; }
 });
-window.addEventListener('keyup', (e) => {
-  if (e.code === 'ArrowDown'){ game.ducking = false; }
+
+window.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  onJumpKey();
 });
 
 // ---- Boot ----
