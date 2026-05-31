@@ -46,10 +46,6 @@ const HERO_RUN2 = [
   "▝▜█████▛▘",
   "  ▖▖ ▗▗  ",
 ];
-const HERO_DUCK = [
-  "▗▆█████▆▖",
-  "▝▘▘  ▝▝▘ ",
-];
 const CACTUS = [
   "  █  ",
   "█ █  ",
@@ -176,7 +172,7 @@ test('rightmostX: returns the max x', () => {
   assert(rightmostX([{x:100},{x:540},{x:300}]) === 540);
 });
 test('getPlayerBox: shrinks the sprite footprint and sits on the ground', () => {
-  game.y = 0; game.ducking = false; game.frame = 0;
+  game.y = 0; game.frame = 0;
   const b = getPlayerBox();
   assert(b.x > PLAYER_X, 'box x padded inward');
   assert(Math.abs((b.y + b.h) - (GROUND_Y - 0)) < HERO_FONT, 'box bottom near ground');
@@ -218,7 +214,6 @@ const game = {
   hi: loadHi(),
   y: 0,                   // player height above ground (px)
   vy: 0,                  // vertical velocity (px/s)
-  ducking: false,
   frame: 0,               // run animation frame (0/1)
   frameTimer: 0,
   obstacles: [],
@@ -230,7 +225,6 @@ function resetGame(){
   game.state = 'playing';
   game.score = 0;
   game.y = 0; game.vy = 0;
-  game.ducking = false;
   game.frame = 0; game.frameTimer = 0;
   game.obstacles = [];
   game.gap = 320;
@@ -266,7 +260,6 @@ function drawScore(){
 }
 
 function playerSprite(){
-  if (game.ducking && game.y === 0) return HERO_DUCK;
   return game.frame ? HERO_RUN2 : HERO_RUN1;
 }
 
@@ -341,10 +334,6 @@ function onJumpKey(){
 }
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'ArrowUp'){ e.preventDefault(); onJumpKey(); }
-  else if (e.code === 'ArrowDown'){ e.preventDefault(); game.ducking = true; }
-});
-window.addEventListener('keyup', (e) => {
-  if (e.code === 'ArrowDown'){ game.ducking = false; }
 });
 
 // ---- Boot ----
