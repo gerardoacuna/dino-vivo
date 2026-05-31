@@ -29,7 +29,7 @@ const HERO_FONT = 22, OBST_FONT = 16;
 const SHRINK = 0.22, OBST_SHRINK = 0.18;
 const SKY_TOP = '#bfe3ff', SKY_BOT = '#eafaff';
 const GROUND_C = '#d9b382', GROUND_LINE = '#a87f4f';
-const CORAL = '#cf6a4c', GREEN = '#3f9e54', BIRDC = '#6b4fa3';
+const CORAL = '#cf6a4c', GREEN = '#3f9e54';
 const TEXT_C = '#2c3e50';
 const HI_KEY = 'dinoAsciiHiScore';
 
@@ -282,9 +282,9 @@ function render(){
   drawScore();
   // overlays
   if (game.state === 'ready')
-    drawCenteredText(ctx, ['PRESIONA ESPACIO', 'PARA EMPEZAR'], TEXT_C);
+    drawCenteredText(ctx, ['TOCA O ESPACIO', 'PARA EMPEZAR'], TEXT_C);
   if (game.state === 'over')
-    drawCenteredText(ctx, ['GAME OVER', 'ESPACIO PARA REINTENTAR'], TEXT_C);
+    drawCenteredText(ctx, ['GAME OVER', 'TOCA PARA REINTENTAR'], TEXT_C);
 }
 
 function update(dt){
