@@ -7,14 +7,15 @@
 <style>
   html,body{height:100%;margin:0;background:#0e2230;display:flex;
     align-items:center;justify-content:center;font-family:system-ui,sans-serif}
-  #game{image-rendering:pixelated;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  #wrap{width:min(96vw,720px)}
+  #game{image-rendering:pixelated;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}
   #hint{color:#cfe6ff;text-align:center;margin-top:10px;font-size:13px;opacity:.8}
 </style>
 </head>
 <body>
-<div>
+<div id="wrap">
   <canvas id="game" width="660" height="220"></canvas>
-  <div id="hint">Espacio/↑ saltar · ↓ agacharse</div>
+  <div id="hint">Toca la pantalla o Espacio para saltar</div>
 </div>
 <script>
 // ---- Constants ----
