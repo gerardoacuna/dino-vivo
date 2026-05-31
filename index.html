@@ -59,14 +59,6 @@ const CACTUS = [
   "  █  ",
   "  █  ",
 ];
-const BIRD1 = [
-  "▝▙   ▟▘",
-  " ▜███▛ ",
-];
-const BIRD2 = [
-  " ▟███▙ ",
-  "▝▛   ▜▘",
-];
 
 // ---- Block drawing ----
 function drawBlock(ctx, lines, x, topY, fontPx, color){
@@ -200,6 +192,15 @@ test('getObstacleBox: shrinks the obstacle footprint', () => {
   const b = getObstacleBox(o);
   assert(b.x > o.x && b.w < o.w && b.h < o.h);
 });
+test('spawnObstacle: only spawns ground cacti', () => {
+  game.obstacles = [];
+  for (let i = 0; i < 20; i++) spawnObstacle();
+  for (const o of game.obstacles){
+    assert(o.h === CACTUS.length * OBST_FONT, 'every obstacle has cactus height');
+    assert(Math.abs((o.y + o.h) - GROUND_Y) < 0.001, 'every obstacle sits on the ground');
+  }
+  game.obstacles = [];
+});
 
 // ---- Game ----
 function loadHi(){
@@ -238,28 +239,19 @@ function resetGame(){
 
 function randGap(){ return 260 + Math.random() * 260; }   // 260..520 px
 
-function makeObstacle(kind){
-  const frames = kind === 'cactus' ? [CACTUS] : [BIRD1, BIRD2];
-  const color  = kind === 'cactus' ? GREEN : BIRDC;
-  const m = measureBlock(ctx, frames[0], OBST_FONT);
-  let topY;
-  if (kind === 'cactus')        topY = GROUND_Y - m.h;        // on the ground -> jump
-  else if (kind === 'birdHigh') topY = 105;                   // body height -> duck
-  else                          topY = GROUND_Y - m.h - 30;   // low -> jump
-  return { kind, frames, color, x: W, y: topY, w: m.w, h: m.h, flip: 0, flipT: 0 };
+function makeObstacle(){
+  const m = measureBlock(ctx, CACTUS, OBST_FONT);
+  return { x: W, y: GROUND_Y - m.h, w: m.w, h: m.h };
 }
 
 function spawnObstacle(){
-  const r = Math.random();
-  const kind = r < 0.5 ? 'cactus' : (r < 0.75 ? 'birdHigh' : 'birdLow');
-  game.obstacles.push(makeObstacle(kind));
+  game.obstacles.push(makeObstacle());
   game.gap = randGap();
 }
 
 function drawObstacles(){
   for (const o of game.obstacles){
-    const frame = o.frames.length > 1 ? o.frames[o.flip] : o.frames[0];
-    drawBlock(ctx, frame, o.x, o.y, OBST_FONT, o.color);
+    drawBlock(ctx, CACTUS, o.x, o.y, OBST_FONT, GREEN);
   }
 }
 
@@ -318,10 +310,6 @@ function update(dt){
   const speed = currentSpeed(game.score);
   for (const o of game.obstacles){
     o.x -= speed * dt;
-    if (o.frames.length > 1){
-      o.flipT += dt;
-      if (o.flipT > 0.15){ o.flip ^= 1; o.flipT = 0; }
-    }
   }
   game.obstacles = game.obstacles.filter(o => o.x + o.w > 0);
   // score
